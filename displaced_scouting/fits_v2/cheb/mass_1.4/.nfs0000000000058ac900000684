@@ -1,0 +1,17 @@
+imax 1  number of channels
+jmax 1  number of backgrounds
+kmax *  number of nuisance parameters (sources of systematical uncertainties)
+------------------------------------
+shapes * * simple-shapes-TH1_mass1.4_Lxy0.2_1.0_cheb_order1.root myWS:$PROCESS
+------------------------------------
+bin bin1
+observation -1
+------------------------------------
+bin bin1 bin1
+process signal background
+process 0 1
+rate 100 1
+------------------------------------
+lumi lnN 1.025 1.0
+bgnorm lnN - 1.05
+signorm lnN 1.05 -
