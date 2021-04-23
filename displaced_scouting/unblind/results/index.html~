@@ -1,3 +1,5 @@
+
+Warning: chdir(): No such file or directory (errno 2) in /Users/hexuser/hardikroutray.github.io/displaced_scouting/unblind/results/index.php on line 6
 <html>
 <head>
 <title></title>
