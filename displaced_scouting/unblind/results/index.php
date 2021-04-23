@@ -8,7 +8,6 @@ chdir($pwd);
 <html>
 <head>
 <title><?php echo $pwdshort; ?></title>
-<link rel="SHORTCUT ICON" type="image/x-icon" href="https://ineuteli.web.cern.ch/ineuteli/favicon.ico"/>
 <style type='text/css'>
   body {
     font-family: "Candara", sans-serif;
@@ -109,7 +108,7 @@ $displayed = array();
 if($_GET['noplots']){
     print "Plots will not be displayed.\n";
 }else{
-    $other_exts = array('.pdf','.jpg','.jpeg','.jpg','.cxx','.eps','.root','.txt','.tex','.log','.dir','.info','.psd');
+    $other_exts = array('.pdf','.jpg','.jpeg','.jpg','.cxx','.eps','.root','.txt','.tex','.log','.dir','.info','.psd', '.py');
     $filenames = glob("*.png"); natsort($filenames);
     $keywords = explode(" ",$_GET['match']);
     foreach($filenames as $filename){
