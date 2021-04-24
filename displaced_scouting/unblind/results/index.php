@@ -35,6 +35,7 @@ chdir($pwd);
     box-shadow: 6px 4px 4px rgb(80,80,90);         /* New browsers */  
     width: 320px;
 /*    min-height: 330px; */
+    min-height: 280px;
     max-height: 380px;
   }
   h1 { color: rgb(40,40,80); }
