@@ -88,6 +88,16 @@ def plot(bin_name="Lxy0.2_11.0_pt0_Inf_012isomu"):
 
     df = dfc[dfc["bin"] == bin_name].set_index("mass")
 
+    if bin_name == "Lxy0.2_11.0_pt25_Inf_012isomu" or bin_name == "Lxy0.2_11.0_pt25_Inf_2isomu":
+        
+        for i in range(len(df.index)):
+            if df.index[i] < 0.35:
+                # print(df.index[i], df["nevtobs_TOY"].iloc[i]) 
+                if df["nevtobs_ASYM"].iloc[i] < 2.5:
+                    df["nevtobs_TOY"].iloc[i] = 3
+                else:
+                    df["nevtobs_TOY"].iloc[i] = df["nevtobs_ASYM"].iloc[i]
+
     df = smooth_(df[[
         "nevt_ASYM",
         "nevtup_ASYM",
@@ -145,7 +155,6 @@ def plot(bin_name="Lxy0.2_11.0_pt0_Inf_012isomu"):
     fig.savefig("plots/superregion_{}_ASYM.png".format(bin_name), dpi=300)
     fig.savefig("plots/superregion_{}_ASYM.pdf".format(bin_name))
 
-    '''
     fig2, ax2 = plt.subplots()
 
     ptoy = ax2.plot(ms, toy, linestyle="-", markersize=3.,marker=None,color="blue",solid_capstyle="butt", zorder=1)
@@ -209,10 +218,9 @@ def plot(bin_name="Lxy0.2_11.0_pt0_Inf_012isomu"):
 
     fig3.savefig("plots/superregion_{}_ASYM_TOY.png".format(bin_name), dpi=300)
     fig3.savefig("plots/superregion_{}_ASYM_TOY.pdf".format(bin_name))
-    '''
 
-
-# plot(bin_name="Lxy0.2_11.0_pt0_Inf_012isomu")
+# plot(bin_name="Lxy0.2_11.0_pt25_Inf_012isomu")
+# plot(bin_name="Lxy0.2_11.0_pt25_Inf_2isomu")
     
 for i in range(len(dfc["bin"].drop_duplicates())):
     plot(bin_name=dfc["bin"][i])
