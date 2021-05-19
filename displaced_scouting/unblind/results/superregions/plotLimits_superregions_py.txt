@@ -1,0 +1,218 @@
+import json, glob, sys, os, gzip, time
+from IPython.display import HTML
+import ipywidgets
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+#from yahist import set_default_style, Hist1D, Hist2D
+# from tqdm.auto import tqdm
+# import requests
+
+
+import matplotlib.patches as mpatches
+import matplotlib.lines as mlines
+import matplotlib.patheffects as meffects
+
+class DoubleBandObject(object): pass
+class DoubleBandObjectHandler(object):
+    def legend_artist(self, legend, orig_handle, fontsize, handlebox):
+        x0, y0 = handlebox.xdescent, handlebox.ydescent
+        width, height = handlebox.width, handlebox.height
+        patch = mpatches.Rectangle([x0, y0-height*0.25], width, height*1.5, facecolor="yellow",
+                                   edgecolor="none", lw=0.,
+                                   transform=handlebox.get_transform())
+        handlebox.add_artist(patch)
+        patch = mpatches.Rectangle([x0, y0+0.25*height*1.5-height*0.25], width, height*1.5*0.5, facecolor="green",
+                                   edgecolor="none", lw=0.,
+                                   transform=handlebox.get_transform())
+        handlebox.add_artist(patch)
+        patch = mlines.Line2D(
+                [x0+width*0.03,x0+width-width*0.03],[y0-height*0.25+height*0.75],color=(0.,0.,0.),linewidth=1,linestyle="--",
+                transform=handlebox.get_transform(),
+                )
+        handlebox.add_artist(patch)
+        return patch
+
+
+def smooth_(df):
+    df = df.sort_index()
+    spikes = []
+    mzs = []
+    window = 3 # times 1%*mass
+    nsigma = 1.5 # if |br - median(window-except-central)|/std(window-except-central) > nsigma, then filter out
+    for column in df.columns:
+        s = df[column]
+        for m in s.index.values:
+            v = s[(s.index > m*(1-window*0.01)) & (s.index < m*(1+window*0.01))]
+            br = v[v.index == m].iloc[0]
+            v = v[v.index != m]
+            v = v[v/v.median() < 20] # exclude points that are 50x the median
+            z = (br-v.median())/v.std()
+            mzs.append([m, z])
+    mzs = np.array(mzs)
+    spikes = mzs[:,0][np.abs(mzs[:,1]) > nsigma].tolist()
+    return df.iloc[~df.index.isin(spikes)]
+
+mask_ranges = np.array([
+    [0.43,0.49],
+    [0.52,0.58],
+    [0.73,0.84],
+    [0.96,1.08],
+    [2.91,3.27],
+    [3.47,3.89],
+    [8.99,9.87],
+    [9.61,10.77],
+    ])
+mask_ranges[:,0] = mask_ranges[:,0]/(1+0.05)
+mask_ranges[:,1] = mask_ranges[:,1]/(1-0.05)
+
+dfc = pd.read_csv("superregions_toylimits.csv")
+droppedmasses = [1.66,1.69,2.8]
+dfc = dfc[~(dfc.mass.isin(droppedmasses))]
+# print dfc["bin"].drop_duplicates()
+
+def plot(bin_name="Lxy0.2_11.0_pt0_Inf_012isomu"):
+
+    lxybin0 = bin_name.split("Lxy")[1].split("_pt")[0].split("_")[0]
+    lxybin1 = bin_name.split("Lxy")[1].split("_pt")[0].split("_")[1]
+
+    ptbin = bin_name.split("Lxy")[1].split("_pt")[1].split("_Inf")[0]
+
+    if "012isomu" in bin_name:
+        isobin = "no isolation"
+    else:
+        isobin = "isolated"
+
+    title = lxybin0 + "-" + lxybin1 + " cm, pt > " + ptbin + ", " + isobin
+    print title
+
+    df = dfc[dfc["bin"] == bin_name].set_index("mass")
+
+    df = smooth_(df[[
+        "nevt_ASYM",
+        "nevtup_ASYM",
+        "nevtupup_ASYM",
+        "nevtdown_ASYM",
+        "nevtdowndown_ASYM",
+        "nevtobs_ASYM",
+        "nevtobs_TOY"
+    ]])
+
+    import matplotlib.gridspec as gridspec
+
+    fig, ax1 = plt.subplots()
+
+    ms = df.index
+    exp = df["nevt_ASYM"]
+    obs = df["nevtobs_ASYM"]
+    sp1 = df["nevtup_ASYM"]
+    sp2 = df["nevtupup_ASYM"]
+    sm1 = df["nevtdown_ASYM"]
+    sm2 = df["nevtdowndown_ASYM"]
+    toy = df["nevtobs_TOY"]
+
+    pe2 = ax1.fill_between(ms, sm2, sp2, linewidth=0., facecolor=(1,0.8,0), alpha=1.0, zorder=1)
+    pe1 = ax1.fill_between(ms, sm1, sp1, linewidth=0., facecolor=(0,0.8,0), alpha=1.0, zorder=1)
+    pe0 = ax1.plot(ms, exp, linestyle="--", marker="",color="red",solid_capstyle="butt", zorder=1)
+    pobs = ax1.plot(ms, obs, linestyle="-", markersize=3.,marker=None,color="k",solid_capstyle="butt", zorder=1)
+
+    legend = ax1.legend([(pobs[0],),DoubleBandObject()],
+                        ["Observed limit (95$\%$ CL)",r"Median expected limit, $\pm$ 68$\%$ exp., $\pm$ 95$\%$ exp."],
+                        handler_map={DoubleBandObject: DoubleBandObjectHandler()},
+                        labelspacing=0.5,
+                        fontsize=8,
+                        handlelength=1.6,
+                        # title=r"0.2-11 cm , p$_{T}(\mu\mu)$ > 0, no isolation",
+                        title = r"{}-{} cm, p$_{}(\mu\mu)$ > {}, {}".format(lxybin0,lxybin1,"T",ptbin,isobin),
+                        loc = "best"
+                    )
+
+
+    ax1.set_yscale("log")
+    ylim = ax1.get_ylim()
+    for low,high in mask_ranges:
+        ax1.fill_betweenx(ylim, low, high, color="0.9", zorder=2)
+    #ax1.set_ylim(1e-7,5e-1)
+    ax1.set_xscale("log")
+
+    ax1.set_xlabel('mass[GeV]')
+    ax1.set_ylabel(r'Number of Events($\Phi \rightarrow$ $\mu\mu$)')
+    ax1.set_title(r"${}_\mathbf{CMS}$ ${}_\mathit{Preliminary}$                                                     101 fb$^{-1}$(13 TeV)")
+
+    ax1.set_xlim(left=0.212,right=50)
+    # ax1.set_xlim(1.0,5)
+
+    fig.savefig("plots/superregion_{}_ASYM.png".format(bin_name), dpi=300)
+    fig.savefig("plots/superregion_{}_ASYM.pdf".format(bin_name))
+
+    '''
+    fig2, ax2 = plt.subplots()
+
+    ptoy = ax2.plot(ms, toy, linestyle="-", markersize=3.,marker=None,color="blue",solid_capstyle="butt", zorder=1)
+
+    legend = ax2.legend([(ptoy[0],)],
+                        ["Observed limit (95$\%$ CL)"],
+                        labelspacing=0.5,
+                        fontsize=8,
+                        handlelength=1.6,
+                        title = r"{}-{} cm, p$_{}(\mu\mu)$ > {}, {}".format(lxybin0,lxybin1,"T",ptbin,isobin),
+                        loc = "best"
+                    )
+
+
+    ax2.set_yscale("log")
+    ylim = ax2.get_ylim()
+    for low,high in mask_ranges:
+        ax2.fill_betweenx(ylim, low, high, color="0.9", zorder=2)
+    #ax2.set_ylim(1e-7,5e-1)
+    ax2.set_xscale("log")
+
+    ax2.set_xlabel('mass[GeV]')
+    ax2.set_ylabel(r'Number of Events($\Phi \rightarrow$ $\mu\mu$)')
+    ax2.set_title(r"${}_\mathbf{CMS}$ ${}_\mathit{Preliminary}$                                                     101 fb$^{-1}$(13 TeV)")
+
+    ax2.set_xlim(left=0.212,right=50)
+    # ax2.set_xlim(1.0,5)
+
+    fig2.savefig("plots/superregion_{}_TOY.png".format(bin_name), dpi=300)
+    fig2.savefig("plots/superregion_{}_TOY.pdf".format(bin_name))
+
+
+    fig3, ax3 = plt.subplots()
+
+    ptoy = ax3.plot(ms, toy, linestyle="-", markersize=3.,marker=None,color="blue",solid_capstyle="butt", zorder=1)
+    pobs1 = ax3.plot(ms, obs, linestyle="-", markersize=3.,marker=None,color="black",solid_capstyle="butt", zorder=1)
+
+    legend = ax3.legend([(ptoy[0],),pobs1[0]],
+                        ["Observed limit TOY (95$\%$ CL)", "Observed limit ASYM (95$\%$ CL)"],
+                        labelspacing=0.5,
+                        fontsize=8,
+                        handlelength=1.6,
+                        title = r"{}-{} cm, p$_{}(\mu\mu)$ > {}, {}".format(lxybin0,lxybin1,"T",ptbin,isobin),
+                        loc = "best"
+                    )
+
+
+    ax3.set_yscale("log")
+    ylim = ax3.get_ylim()
+    for low,high in mask_ranges:
+        ax3.fill_betweenx(ylim, low, high, color="0.9", zorder=2)
+    #ax3.set_ylim(1e-7,5e-1)
+    ax3.set_xscale("log")
+
+    ax3.set_xlabel('mass[GeV]')
+    ax3.set_ylabel(r'Number of Events($\Phi \rightarrow$ $\mu\mu$)')
+    ax3.set_title(r"${}_\mathbf{CMS}$ ${}_\mathit{Preliminary}$                                                     101 fb$^{-1}$(13 TeV)")
+
+    ax3.set_xlim(left=0.212,right=50)
+    # ax3.set_xlim(1.0,5)
+
+    fig3.savefig("plots/superregion_{}_ASYM_TOY.png".format(bin_name), dpi=300)
+    fig3.savefig("plots/superregion_{}_ASYM_TOY.pdf".format(bin_name))
+    '''
+
+
+# plot(bin_name="Lxy0.2_11.0_pt0_Inf_012isomu")
+    
+for i in range(len(dfc["bin"].drop_duplicates())):
+    plot(bin_name=dfc["bin"][i])
