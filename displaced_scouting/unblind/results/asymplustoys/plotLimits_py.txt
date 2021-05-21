@@ -353,8 +353,13 @@ for k in limits.keys():
     lel .append(limits[k][whichLimit   ])
     lp1l.append(limits[k][whichLimit1up])
     lp2l.append(limits[k][whichLimit2up])
-    lm1l.append(limits[k][whichLimit1dn])
-    lm2l.append(limits[k][whichLimit2dn])
+    
+    # lm1l.append(limits[k][whichLimit1dn])
+    # lm2l.append(limits[k][whichLimit2dn])
+    
+    lm1l.append(min(limits[k][whichLimit1dn], limits[k][whichLimit]))
+    lm2l.append(min(limits[k][whichLimit2dn], limits[k][whichLimit]))
+
     lol .append(limits[k][whichLimitObs])
 
 mv   = np.array(ml  )
