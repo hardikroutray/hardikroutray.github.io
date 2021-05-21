@@ -1,0 +1,386 @@
+import pandas as pd
+import csv
+import os
+import sys
+from array import array
+
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import glob
+from matplotlib.colors import LogNorm
+
+import numpy, scipy, scipy.optimize
+import matplotlib
+# from mpl_toolkits.mplot3d import  Axes3D                                                      
+from matplotlib import cm # to colormap 3D surfaces from blue to red                           
+
+import matplotlib.pyplot as plt
+from scipy.interpolate import Rbf
+from scipy.interpolate import interp2d
+
+import ROOT
+
+graphWidth = 800 # units are pixels                                                            
+graphHeight = 600 # units are pixels                                                           
+
+# 3D contour plot lines                                                                        
+numberOfContourLines = 16
+
+hzdallcsv = pd.read_csv('totalacceptance_hzd.csv')
+hzdbincsv = pd.read_csv('binbybinacceptance_hzd.csv')
+hzdallcsv4mu = pd.read_csv('totalacceptance_hzd4mu.csv')
+
+# hzdallcsv = pd.read_csv('totalacceptance_hzd_ctgt1000.csv')
+# hzdbincsv = pd.read_csv('binbybinacceptance_hzd_ctgt1000.csv')
+# hzdallcsv4mu = pd.read_csv('totalacceptance_hzd4mu_ctgt1000.csv')
+
+df_hzd_theory = pd.read_csv("hzdtheory.csv").set_index("mass")
+rcsv = pd.read_csv('scaledtoys_HZdZd_rval_abovejpsi.csv')
+
+x = []
+y = []
+zexp50 = []
+accbr = []
+acc = []
+
+masseslist = rcsv[rcsv["model"]=="HZdZd_2mu4mu"]["mass"].drop_duplicates().tolist()
+print len(masseslist)
+
+nodp = False
+# nodp = True
+
+masses1 = []
+for i in range(len(masseslist)):
+    if (masseslist[i] < 0.5) or (masseslist[i] > 0.41 and masseslist[i] < 0.515) or (masseslist[i] > 0.495 and masseslist[i] < 0.61) or (masseslist[i] > 0.695 and masseslist[i] < 0.88) or (masseslist[i] > 0.915 and masseslist[i] < 1.13) or (masseslist[i] > 2.81 and masseslist[i] < 4.09) or (masseslist[i] > 8.59 and masseslist[i] < 11.27):
+        continue
+    masses1.append(masseslist[i])
+
+print len(masses1)
+# print(masses1)
+
+masses = [masses1[int(sys.argv[1])]]
+
+ctaus = [1,10,100]
+# ctaus = [0.1,0.2,0.5,0.8,1,2,5,8,10,20,50,80,100,200,500,800,1000]
+# ctaus = [2000,5000,8000,10000]
+
+def get_brzdtosm(mass):
+    """
+    Mass in GeV
+    Returns BR(Zd->mumu).
+    """
+    row = df_hzd_theory.iloc[np.abs(df_hzd_theory.index - mass*1e3).argmin()]
+    return row["br_zdtosm"]
+
+def acceptance_and_staterr_4mu(mass=2, ctau=1):
+
+    df = hzdallcsv4mu.sort_values(["mass","ctau"]).pivot(index="mass", columns="ctau", values=["acc"])
+    masses = df.index
+    ctaus = df.columns.levels[1]
+    matrix = df.values.T
+    acc_func = interp2d(masses, ctaus, matrix, bounds_error=True)
+
+    df = hzdallcsv4mu.sort_values(["mass","ctau"]).pivot(index="mass", columns="ctau", values=["staterr"])
+    masses = df.index
+    ctaus = df.columns.levels[1]
+    matrix = df.values.T
+    staterr_func = interp2d(masses, ctaus, matrix, bounds_error=True)
+
+    return (acc_func(mass,ctau)[0], staterr_func(mass,ctau)[0])
+# !scp totalacceptance_hzd4mu.csv ucsd:/home/users/namin/2019/scouting/repo/hardik_limits/displacedscouting_fitscountlimits/fourmuon
+
+def acceptance(mass = 2, ctau = 1, sample="hzd",whichbin="lxybin1_ptbin1_isobin1"):
+
+    if sample == "hzd":
+        if whichbin != "allbins":
+
+            df = hzdbincsv.sort_values(["mass","ctau"]).pivot(index="mass", columns="ctau", values=['acc_'+whichbin])
+            x_data = df.index
+            y_data = df.columns.levels[1]
+            z_data = df.values.T
+
+        elif whichbin == "allbins":
+
+            df = hzdallcsv.sort_values(["mass","ctau"]).pivot(index="mass", columns="ctau", values=['acc_'+whichbin])
+            x_data = df.index
+            y_data = df.columns.levels[1]
+            z_data = df.values.T
+
+    if sample == "bphi":
+        if whichbin != "allbins":
+
+            df = bphibincsv.sort_values(["mass","ctau"]).pivot(index="mass", columns="ctau", values=['acc_'+whichbin])
+            x_data = df.index
+            y_data = df.columns.levels[1]
+            z_data = df.values.T
+
+        elif whichbin == "allbins":
+
+            df = bphiallcsv.sort_values(["mass","ctau"]).pivot(index="mass", columns="ctau", values=['acc_'+whichbin])
+            x_data = df.index
+            y_data = df.columns.levels[1]
+            z_data = df.values.T
+
+    acc = interp2d(x_data, y_data, z_data, bounds_error=True)
+
+    return acc(mass,ctau)[0]
+
+# print "the total acceptance", float(acceptance(2,1,sample="hzd",whichbin="allbins"))
+# print "the bin acceptance", float(acceptance(2,1,sample="hzd",whichbin=getbin(inputcard=card)))
+
+def get_rough_nul(mass, ctau=10):
+    # roughly calculate expected NUL in order to normalize signal rate       
+    # so that combine will return values near r = 1                               
+    if mass < 3: nul = 30.
+    elif mass < 5: nul = 5.
+    else: nul = 3.
+    # for small ctau, limit is weaker by 2-4x                                        
+    if ctau < 5: nul *= 3.
+    return nul
+
+
+dct = {}
+  
+for k in range(len(ctaus)):
+    dct['ctau{}_exp50'.format(ctaus[k])] = []
+
+for j in range(len(masses)):
+
+    dct['mass{}_exp50'.format(masses[j])] = []
+    dct['mass{}_nevtexp50'.format(masses[j])] = []
+    dct['mass{}_nevtup'.format(masses[j])] = []
+    dct['mass{}_nevtdown'.format(masses[j])] = []
+    dct['mass{}_nevtupup'.format(masses[j])] = []
+    dct['mass{}_nevtdowndown'.format(masses[j])] = []
+    dct['mass{}_nevtobs'.format(masses[j])] = []
+    dct['mass{}_brfracexp50'.format(masses[j])] = []
+    dct['mass{}_brfracup'.format(masses[j])] = []
+    dct['mass{}_brfracdown'.format(masses[j])] = []
+    dct['mass{}_brfracupup'.format(masses[j])] = []
+    dct['mass{}_brfracdowndown'.format(masses[j])] = []
+    dct['mass{}_brfracobs'.format(masses[j])] = []
+
+    for k in range(len(ctaus)):
+
+        print "looking at mass ", masses[j], "and ctau ", ctaus[k]
+
+        print "The acceptance of this mass,ctau point is ", acceptance(mass=masses[j],ctau=ctaus[k],sample="hzd",whichbin="allbins")
+        acc_allbins = acceptance(mass=masses[j],ctau=ctaus[k],sample="hzd",whichbin="allbins")
+
+        
+        lxybins = np.array([[0.0,0.2], [0.2,1.0], [1.0,2.4], [2.4,3.1], [3.1,7.0], [7.0,11.0]])
+        ptbins = np.array([[0,25],[25,5000]])
+        isobins = np.array([[1,0,0],[0,1,0],[0,0,1]])
+
+        signal_rates = {}
+
+        for l in range(len(lxybins)):
+            for m in range(len(ptbins)):                                                      
+                for n in range(len(isobins)):  
+
+                    acc_val = acceptance(mass=masses[j],ctau=ctaus[k],sample="hzd",whichbin="lxybin{}_ptbin{}_isobin{}".format(l+1,m+1,n+1)) 
+
+                    if  acc_val > 0.000000000001:
+                        signal_rates['lxybin{}_ptbin{}_isobin{}'.format(l+1,m+1,n+1)] = acc_val
+                    else:
+                        signal_rates['lxybin{}_ptbin{}_isobin{}'.format(l+1,m+1,n+1)] = 1e-8
+
+        mass = masses[j]
+        ctau = ctaus[k]
+        brzdtosm = get_brzdtosm(mass)
+        acc_4mu, relerr_4mu = acceptance_and_staterr_4mu(mass, ctau)
+
+        print ("brzdtosm:",brzdtosm)
+        print ("acc_4mu:",acc_4mu)
+        print ("relerr_4mu:",relerr_4mu)
+
+        for sr in signal_rates.keys():
+            signal_rates[sr] = signal_rates[sr] * 2*brzdtosm*(1-brzdtosm)
+        signal_rate_4mu = acc_4mu * brzdtosm**2
+
+        totalsignalrateraw = sum(signal_rates.values()) + signal_rate_4mu
+                    
+        print "The sum of signal rates or total acceptance is", totalsignalrateraw
+        print "The 4mu acceptance is", signal_rate_4mu
+
+        nevtul_guess = get_rough_nul(masses[j], ctaus[k])
+        normfactor = nevtul_guess  / totalsignalrateraw
+        for sr in signal_rates.keys():
+            if signal_rates[sr] <= 1e-8: continue
+            signal_rates[sr] *= normfactor
+        signal_rate_4mu *= normfactor
+
+        totalsignalrate = sum(signal_rates.values()) + signal_rate_4mu
+
+        coml_obs = float(rcsv.loc[(rcsv["model"]=="HZdZd_2mu4mu") & (rcsv["mass"]==masses[j]) & (rcsv["ctau"]==ctaus[k]), "obs"])
+
+        coml_2sd = float(rcsv.loc[(rcsv["model"]=="HZdZd_2mu4mu") & (rcsv["mass"]==masses[j]) & (rcsv["ctau"]==ctaus[k]), "expm2"])
+
+        coml_1sd = float(rcsv.loc[(rcsv["model"]=="HZdZd_2mu4mu") & (rcsv["mass"]==masses[j]) & (rcsv["ctau"]==ctaus[k]), "expm1"])
+
+        coml_exp = float(rcsv.loc[(rcsv["model"]=="HZdZd_2mu4mu") & (rcsv["mass"]==masses[j]) & (rcsv["ctau"]==ctaus[k]), "exp"])
+
+        coml_1su = float(rcsv.loc[(rcsv["model"]=="HZdZd_2mu4mu") & (rcsv["mass"]==masses[j]) & (rcsv["ctau"]==ctaus[k]), "expp1"])
+
+        coml_2su = float(rcsv.loc[(rcsv["model"]=="HZdZd_2mu4mu") & (rcsv["mass"]==masses[j]) & (rcsv["ctau"]==ctaus[k]), "expp2"])
+
+        print coml_obs, coml_2sd, coml_1sd, coml_exp, coml_1su, coml_2su
+
+        exp_xsec = (coml_exp*totalsignalrate)/(101.3*totalsignalrateraw)
+        nevt = coml_exp*totalsignalrate
+        nevtup = coml_1su*totalsignalrate
+        nevtdown = coml_1sd*totalsignalrate
+        nevtupup = coml_2su*totalsignalrate
+        nevtdowndown = coml_2sd*totalsignalrate
+        nevtobs = coml_obs*totalsignalrate
+        brfrac = (coml_exp*totalsignalrate)/(101.3*totalsignalrateraw*48610.7)
+        brfracup = (coml_1su*totalsignalrate)/(101.3*totalsignalrateraw*48610.7)
+        brfracdown = (coml_1sd*totalsignalrate)/(101.3*totalsignalrateraw*48610.7)
+        brfracupup = (coml_2su*totalsignalrate)/(101.3*totalsignalrateraw*48610.7)
+        brfracdowndown = (coml_2sd*totalsignalrate)/(101.3*totalsignalrateraw*48610.7)
+        brfracobs = (coml_obs*totalsignalrate)/(101.3*totalsignalrateraw*48610.7)
+
+        print "The expected 50% UL xsec is ", exp_xsec
+
+        x.append(masses[j])
+        y.append(ctaus[k])
+        zexp50.append(exp_xsec)
+        acc.append(acc_allbins + acc_4mu)
+
+        dct['mass{}_exp50'.format(masses[j])].append(exp_xsec)
+        dct['ctau{}_exp50'.format(ctaus[k])].append(exp_xsec)
+        
+        dct['mass{}_nevtexp50'.format(masses[j])].append(nevt)
+        dct['mass{}_nevtup'.format(masses[j])].append(nevtup)
+        dct['mass{}_nevtdown'.format(masses[j])].append(nevtdown)
+        dct['mass{}_nevtupup'.format(masses[j])].append(nevtupup)
+        dct['mass{}_nevtdowndown'.format(masses[j])].append(nevtdowndown)
+        dct['mass{}_nevtobs'.format(masses[j])].append(nevtobs)
+
+        dct['mass{}_brfracexp50'.format(masses[j])].append(brfrac)
+        dct['mass{}_brfracup'.format(masses[j])].append(brfracup)
+        dct['mass{}_brfracdown'.format(masses[j])].append(brfracdown)
+        dct['mass{}_brfracupup'.format(masses[j])].append(brfracupup)
+        dct['mass{}_brfracdowndown'.format(masses[j])].append(brfracdowndown)
+        dct['mass{}_brfracobs'.format(masses[j])].append(brfracobs)
+
+    print "the expected 50% UL xsec for this mass for different ctaus is", dct['mass{}_exp50'.format(masses[j])]
+ 
+# print "the expected 50% UL xsec for ctau 20 for different masses is", dct['ctau20_exp50']
+
+print "The ordered mass of all points", x
+print "The ordered ctau of all points", y
+print "The ordered acceptance of all points",acc
+print "The ordered exp 50% UL of all points", zexp50
+
+# print dct['mass{}_exp50'.format(masses[0])]
+
+import pandas as pd
+
+arr = []
+arr.append(masses[0])
+
+arr1 = []
+arr1.append(masses[0])
+
+arr1up = []
+arr1up.append(masses[0])
+
+arr1down = []
+arr1down.append(masses[0])
+
+arr1upup = []
+arr1upup.append(masses[0])
+
+arr1downdown = []
+arr1downdown.append(masses[0])
+
+arr1obs = []
+arr1obs.append(masses[0])
+
+arr2 = []
+arr2.append(masses[0])
+
+arr2up = []
+arr2up.append(masses[0])
+
+arr2down = []
+arr2down.append(masses[0])
+
+arr2upup = []
+arr2upup.append(masses[0])
+
+arr2downdown = []
+arr2downdown.append(masses[0])
+
+arr2obs = []
+arr2obs.append(masses[0])
+
+for i in range(len(ctaus)):
+    arr.append(dct['mass{}_exp50'.format(masses[0])][i])
+    arr1.append(dct['mass{}_nevtexp50'.format(masses[0])][i])
+    arr1up.append(dct['mass{}_nevtup'.format(masses[0])][i])
+    arr1down.append(dct['mass{}_nevtdown'.format(masses[0])][i])
+    arr1upup.append(dct['mass{}_nevtupup'.format(masses[0])][i])
+    arr1downdown.append(dct['mass{}_nevtdowndown'.format(masses[0])][i])
+    arr1obs.append(dct['mass{}_nevtobs'.format(masses[0])][i])
+
+    arr2.append(dct['mass{}_brfracexp50'.format(masses[0])][i])
+    arr2up.append(dct['mass{}_brfracup'.format(masses[0])][i])
+    arr2down.append(dct['mass{}_brfracdown'.format(masses[0])][i])
+    arr2upup.append(dct['mass{}_brfracupup'.format(masses[0])][i])
+    arr2downdown.append(dct['mass{}_brfracdowndown'.format(masses[0])][i])
+    arr2obs.append(dct['mass{}_brfracobs'.format(masses[0])][i])
+
+    
+print arr
+
+columns = ['mass'] + ['ctau = {}'.format(ctau) for ctau in ctaus]
+
+df = pd.DataFrame([arr],columns=columns)
+
+df1 = pd.DataFrame([arr1],columns=columns)
+
+df1up = pd.DataFrame([arr1up],columns=columns)
+
+df1down = pd.DataFrame([arr1down],columns=columns)
+
+df1upup = pd.DataFrame([arr1upup],columns=columns)
+
+df1downdown = pd.DataFrame([arr1downdown],columns=columns)
+
+df1obs = pd.DataFrame([arr1obs],columns=columns)
+
+df2 = pd.DataFrame([arr2],columns=columns)
+
+df2up = pd.DataFrame([arr2up],columns=columns)
+
+df2down = pd.DataFrame([arr2down],columns=columns)
+
+df2upup = pd.DataFrame([arr2upup],columns=columns)
+
+df2downdown = pd.DataFrame([arr2downdown],columns=columns)
+
+df2obs = pd.DataFrame([arr2obs],columns=columns)
+
+print df
+
+if not os.path.exists("csvlimits1"):                                         
+    os.makedirs("csvlimits1")
+
+df.to_csv('csvlimits1/xsecBRbrUL_mass{}_v0.csv'.format(masses[0]),index=False)
+
+df1.to_csv('csvlimits1/nevtUL_mass{}_v0.csv'.format(masses[0]),index=False)
+df1up.to_csv('csvlimits1/nevtULup_mass{}_v0.csv'.format(masses[0]),index=False)
+df1down.to_csv('csvlimits1/nevtULdown_mass{}_v0.csv'.format(masses[0]),index=False)
+df1upup.to_csv('csvlimits1/nevtULupup_mass{}_v0.csv'.format(masses[0]),index=False)
+df1downdown.to_csv('csvlimits1/nevtULdowndown_mass{}_v0.csv'.format(masses[0]),index=False)
+df1obs.to_csv('csvlimits1/nevtULobs_mass{}_v0.csv'.format(masses[0]),index=False)
+
+df2.to_csv('csvlimits1/BRbrUL_mass{}_v0.csv'.format(masses[0]),index=False)
+df2up.to_csv('csvlimits1/BRbrULup_mass{}_v0.csv'.format(masses[0]),index=False)
+df2down.to_csv('csvlimits1/BRbrULdown_mass{}_v0.csv'.format(masses[0]),index=False)
+df2upup.to_csv('csvlimits1/BRbrULupup_mass{}_v0.csv'.format(masses[0]),index=False)
+df2downdown.to_csv('csvlimits1/BRbrULdowndown_mass{}_v0.csv'.format(masses[0]),index=False)
+df2obs.to_csv('csvlimits1/BRbrULobs_mass{}_v0.csv'.format(masses[0]),index=False)
