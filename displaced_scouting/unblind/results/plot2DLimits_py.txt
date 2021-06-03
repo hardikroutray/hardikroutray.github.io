@@ -2,8 +2,16 @@ import json, glob, sys, os, gzip, time
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt 
+from scipy.interpolate import interp2d
+from scipy.interpolate import griddata
+
+import ROOT
+from ROOT import TTree, TFile
+from array import array
 
 model = str(sys.argv[-1])
+
+print("-----Please run in python 3-----")
 
 if model == "BphiX":
     df_obs = pd.read_csv("https://hardikroutray.github.io/displaced_scouting/unblind/results/bphilimits_alldata_allctaus_wstheta_analysisDP_v1.csv")
@@ -36,16 +44,28 @@ if model == "BphiX":
     x = np.array(df_obs["mass"]).reshape(-1,13)
     y = np.array(df_obs["ctau"]).reshape(-1,13)
     z = np.array(df_obs["BRbrULobs"]).reshape(-1,13)
+
+    # f = interp2d(x, y, z, bounds_error=True)
+    # x_new = np.arange(0.3,5,0.001)
+    # y_new = np.arange(0.1,100,0.1)
+    # X, Y = np.meshgrid(y_new,x_new)
+
+    # print("shape of:", " x", x.shape, " y", y.shape, " z", z.shape, " x_new", x_new.shape, " y_new", y_new.shape, " X", X.shape, " Y", Y.shape)
+
+    # Z = griddata((x.flatten(), y.flatten()), z.flatten(), (X, Y), method='linear')
+
 else:
     x = np.array(df_obs["mass"]).reshape(-1,21)
     y = np.array(df_obs["ctau"]).reshape(-1,21)
     z = np.array(df_obs["BRbrULobs"]).reshape(-1,21)
+
 
 fig = plt.figure()
 
 from matplotlib.colors import LogNorm
 norm = LogNorm()
 cb = plt.contourf(x,y,z,cmap="Set3",norm=norm)
+# cb = plt.contourf(X,Y,Z,cmap="Set3",norm=norm)
 plt.yscale("log")
 plt.xscale("log")
 
@@ -60,7 +80,7 @@ for low,high in mask_ranges:
     
 plt.xlabel(r"m$_{\phi}$ [GeV]")
 plt.ylabel(r"$c\tau$ [mm]")
-plt.title(r"${}_\mathbf{CMS}$ ${}_\mathit{Preliminary}$                             101 fb$^{-1}$(13 TeV)")
+plt.title(r"${}_\mathbf{CMS}$ ${}_\mathit{Supplementary}$                         101 fb$^{-1}$(13 TeV)")
 
 if model == "BphiX":
     fig.colorbar(cb, label=r"BR(B $\rightarrow$ $\phi$ X).BR($\phi$ $\rightarrow$ $\mu\mu$)")
@@ -71,3 +91,47 @@ fig.patch.set_alpha(1)
 
 fig.savefig("mass_ctau_{}_exclusion.png".format(model), dpi=300)
 fig.savefig("mass_ctau_{}_exclusion.pdf".format(model))
+
+#######################store values in root file######################
+
+if model == "BphiX":
+    outfile = TFile('BphiX_UL.root', 'recreate')
+else:
+    outfile = TFile('HZdZd_UL.root', 'recreate')
+
+outfile.cd()
+
+if model == "BphiX":
+    ttree = TTree('ttree', 'ttree with BphiX UL')
+else:
+    ttree = TTree('ttree', 'ttree with HZdZd UL')
+
+mass = array("f", [0.0])
+ctau = array("f", [0.0])
+ul = array("d", [0.0])
+
+ttree.Branch("mass", mass, "mass/F")
+ttree.Branch("ctau", ctau, "ctau/F")
+ttree.Branch("ul", ul, "ul/D")
+
+masses = df_obs["mass"].tolist()
+ctaus = df_obs["ctau"].tolist()
+uls = df_obs["BRbrULobs"].tolist()
+
+num = 0
+for ev in range(len(masses)):
+    num+= 1
+
+    mass[0] = round(masses[ev],3)
+    ctau[0] = round(ctaus[ev],1)
+    ul[0] = round(uls[ev],15)
+    # ul[0] = uls[ev]
+    
+    # print(mass[0],ctau[0],ul[0])
+    print(round(masses[ev],3),round(ctaus[ev],1),round(uls[ev],15))
+        
+
+    ttree.Fill()
+
+outfile.Write()
+outfile.Close()
