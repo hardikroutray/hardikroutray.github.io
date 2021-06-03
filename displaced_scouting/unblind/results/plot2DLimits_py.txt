@@ -1,0 +1,73 @@
+import json, glob, sys, os, gzip, time
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt 
+
+model = str(sys.argv[-1])
+
+if model == "BphiX":
+    df_obs = pd.read_csv("https://hardikroutray.github.io/displaced_scouting/unblind/results/bphilimits_alldata_allctaus_wstheta_analysisDP_v1.csv")
+elif model == "HZdZd_2mu4mu":
+    df_obs = pd.read_csv("https://hardikroutray.github.io/displaced_scouting/unblind/results/hzdlimits_alldata_allctaus_weps_analysisDP_twomufourmu_v1.csv")
+else:
+    print("-----Please input last argument as BphiX or HZdZd_2mu4mu-----")
+    exit()
+
+print("Running on model", model)
+
+if model == "HZdZd_2mu4mu":
+    df_obs = df_obs[df_obs["BRbrULobs"] <= 1]
+
+mask_ranges = np.array([
+    [0.43,0.49],
+    [0.52,0.58],
+    [0.73,0.84],
+    [0.96,1.08],
+    [2.91,3.27],
+    [3.47,3.89],
+    [8.99,9.87],
+    [9.61,10.77],
+    ])
+mask_ranges[:,0] = mask_ranges[:,0]/(1+0.05)
+mask_ranges[:,1] = mask_ranges[:,1]/(1-0.05)
+
+
+if model == "BphiX":
+    x = np.array(df_obs["mass"]).reshape(-1,13)
+    y = np.array(df_obs["ctau"]).reshape(-1,13)
+    z = np.array(df_obs["BRbrULobs"]).reshape(-1,13)
+else:
+    x = np.array(df_obs["mass"]).reshape(-1,21)
+    y = np.array(df_obs["ctau"]).reshape(-1,21)
+    z = np.array(df_obs["BRbrULobs"]).reshape(-1,21)
+
+fig = plt.figure()
+
+from matplotlib.colors import LogNorm
+norm = LogNorm()
+cb = plt.contourf(x,y,z,cmap="Set3",norm=norm)
+plt.yscale("log")
+plt.xscale("log")
+
+if model == "BphiX":
+    plt.xlim([0.3,5])
+else:
+    plt.xlim([0.5,50])
+
+ylim = plt.ylim()
+for low,high in mask_ranges:
+    plt.fill_betweenx(ylim, low, high, color="0.8", zorder=2)
+    
+plt.xlabel(r"m$_{\phi}$ [GeV]")
+plt.ylabel(r"$c\tau$ [mm]")
+plt.title(r"${}_\mathbf{CMS}$ ${}_\mathit{Preliminary}$                             101 fb$^{-1}$(13 TeV)")
+
+if model == "BphiX":
+    fig.colorbar(cb, label=r"BR(B $\rightarrow$ $\phi$ X).BR($\phi$ $\rightarrow$ $\mu\mu$)")
+else:
+    fig.colorbar(cb, label=r"BR(H $\rightarrow$ Z$_{D}$Z$_{D}$)")
+
+fig.patch.set_alpha(1)
+
+fig.savefig("mass_ctau_{}_exclusion.png".format(model), dpi=300)
+fig.savefig("mass_ctau_{}_exclusion.pdf".format(model))
