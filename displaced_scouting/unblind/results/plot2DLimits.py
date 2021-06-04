@@ -41,6 +41,14 @@ mask_ranges = np.array([
 mask_ranges[:,0] = mask_ranges[:,0]/(1+0.05)
 mask_ranges[:,1] = mask_ranges[:,1]/(1-0.05)
 
+mask_ranges=np.array([[ 0.40952381,  0.51578947],
+ [ 0.4952381,   0.61052632],
+ [ 0.6952381,   0.88421053],
+ [ 0.91428571,  1.13684211],
+ [ 2.77142857,  4.09473684],
+ [ 8.56190476, 11.33684211]])
+
+
 if model == "BphiX":
     x = np.array(df_obs["mass"]).reshape(-1,13)
     y = np.array(df_obs["ctau"]).reshape(-1,13)
@@ -70,7 +78,8 @@ norm = LogNorm()
 
 if model == "BphiX":
     levels = [1e-11,1e-10,1e-9,1e-8,1e-7,1e-6,1e-5]
-    levvals = ["1em11","1em10","1em9","1em8","1em7","1em6","1em5"]
+    levvals = ["1em11","1em10","1em9","1em8","1em7","1em6","1em5"]    
+    # levels = [1e-11,1e-10]
 else:
     levels = [1e-6,1e-5,1e-4,1e-3,1e-2,1e-1,1]
     levvals = ["1em6","1em5","1em4","1em3","1em2","1em1","1e0"]
@@ -110,6 +119,8 @@ fig.patch.set_alpha(1)
 fig.savefig("mass_ctau_{}_exclusion.png".format(model), dpi=300)
 fig.savefig("mass_ctau_{}_exclusion.pdf".format(model))
 
+# exit()
+
 graphs = dict()
 
 print("The number of levels", len(cb.allsegs))
@@ -121,8 +132,17 @@ for lev in range(len(cb.allsegs)):
 
     for cur in range(len(cb.allsegs[lev])):
         # print("The number of points in this curve", len(cb.allsegs[lev][cur]))
-        xval = cb.allsegs[lev][cur][:,0]
-        yval = cb.allsegs[lev][cur][:,1]
+        xval_ = cb.allsegs[lev][cur][:,0]
+        yval_ = cb.allsegs[lev][cur][:,1]
+        # print(xval_,yval_)
+
+        xval = []
+        yval = []
+        for val in range(len(xval_)):
+            if any((sublist[0] <= xval_[val] <= sublist[1]) for sublist in mask_ranges):
+                continue
+            xval.append(xval_[val])
+            yval.append(yval_[val])
         # print(xval,yval)
 
         g = ROOT.TGraph(len(xval))
