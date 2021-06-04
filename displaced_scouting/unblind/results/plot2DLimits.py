@@ -17,15 +17,15 @@ print("-----Please run in python 3-----")
 
 if model == "BphiX":
     df_obs = pd.read_csv("https://hardikroutray.github.io/displaced_scouting/unblind/results/bphilimits_alldata_allctaus_wstheta_analysisDP_v1.csv")
-elif model == "HZdZd_2mu4mu":
+elif model == "HZdZd_2mu4mu" or model=="HZdZd_2mu4mu_eps":
     df_obs = pd.read_csv("https://hardikroutray.github.io/displaced_scouting/unblind/results/hzdlimits_alldata_allctaus_weps_analysisDP_twomufourmu_v1.csv")
 else:
-    print("-----Please input last argument as BphiX or HZdZd_2mu4mu-----")
+    print("-----Please input last argument as BphiX or HZdZd_2mu4mu or HZdZd_2mu4mu_eps-----")
     exit()
 
 print("Running on model", model)
 
-if model == "HZdZd_2mu4mu":
+if model == "HZdZd_2mu4mu" or model == "HZdZd_2mu4mu_eps":
     df_obs = df_obs[df_obs["BRbrULobs"] <= 1]
 
 mask_ranges = np.array([
@@ -63,11 +63,15 @@ if model == "BphiX":
     # print(x.flatten(),y.flatten())
     # Z = griddata((x.flatten(), y.flatten()), z.flatten(), (X, Y), method='cubic')
 
-else:
+elif model == "HZdZd_2mu4mu":
     x = np.array(df_obs["mass"]).reshape(-1,21)
     y = np.array(df_obs["ctau"]).reshape(-1,21)
     z = np.array(df_obs["BRbrULobs"]).reshape(-1,21)
 
+else:
+    x = np.array(df_obs["mass"]).reshape(-1,21)
+    y = np.array(df_obs["eps"]).reshape(-1,21)
+    z = np.array(df_obs["BRbrULobs"]).reshape(-1,21)
 
 fig = plt.figure()
 
@@ -106,7 +110,11 @@ for low,high in mask_ranges:
     plt.fill_betweenx(ylim, low, high, color="0.8", zorder=2)
     
 plt.xlabel(r"m$_{\phi}$ [GeV]")
-plt.ylabel(r"$c\tau$ [mm]")
+if "eps" in model:
+    plt.ylabel(r"$\epsilon$")
+else:
+    plt.ylabel(r"$c\tau$ [mm]")
+
 plt.title(r"${}_\mathbf{CMS}$ ${}_\mathit{Supplementary}$                         101 fb$^{-1}$(13 TeV)")
 
 if model == "BphiX":
@@ -153,8 +161,10 @@ for lev in range(len(cb.allsegs)):
 
 if model == "BphiX":
     outfile = TFile('BphiX_UL.root', 'recreate')
-else:
+elif model == "HZdZd_2mu4mu":
     outfile = TFile('HZdZd_UL.root', 'recreate')
+else:
+    outfile = TFile('HZdZd_eps_UL.root', 'recreate')
 outfile.cd()
  
 for k,v in graphs.items():
