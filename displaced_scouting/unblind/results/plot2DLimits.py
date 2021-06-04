@@ -6,6 +6,8 @@ from scipy.interpolate import interp2d
 from scipy.interpolate import griddata
 
 import ROOT
+ROOT.gROOT.SetBatch(True)
+
 from ROOT import TTree, TFile
 from array import array
 
@@ -63,7 +65,18 @@ fig = plt.figure()
 
 from matplotlib.colors import LogNorm
 norm = LogNorm()
-cb = plt.contourf(x,y,z,cmap="Set3",norm=norm)
+
+# cb = plt.contourf(x,y,z,cmap="Set3",norm=norm)
+
+if model == "BphiX":
+    levels = [1e-11,1e-10,1e-9,1e-8,1e-7,1e-6,1e-5]
+    levvals = ["1em11","1em10","1em9","1em8","1em7","1em6","1em5"]
+else:
+    levels = [1e-6,1e-5,1e-4,1e-3,1e-2,1e-1,1]
+    levvals = ["1em6","1em5","1em4","1em3","1em2","1em1","1e0"]
+
+cb = plt.contourf(x,y,z,cmap="Set3",norm=norm,levels=levels)
+
 # cb = plt.contourf(X,Y,Z,cmap="Set3",norm=norm)
 # cb = plt.pcolormesh(x,y,z,cmap="Set3",norm=norm)
 # cb = plt.scatter(x,y,c=z,cmap="Set3",norm=norm)
@@ -97,33 +110,36 @@ fig.patch.set_alpha(1)
 fig.savefig("mass_ctau_{}_exclusion.png".format(model), dpi=300)
 fig.savefig("mass_ctau_{}_exclusion.pdf".format(model))
 
-# def get_contour_verts(cn):
-#     contours = []
-#     # for each contour line
-#     for cc in cn.collections:
-#         paths = []
-#         # for each separate section of the contour line
-#         for pp in cc.get_paths():
-#             xy = []
-#             # for each segment of that section
-#             for vv in pp.iter_segments():
-#                 xy.append(vv[0])
-#             paths.append(np.vstack(xy))
-#         contours.append(paths)
+graphs = dict()
 
-#     return contours
-
-# contours = get_contour_verts(cb)
-# print(contours)
-
+print("The number of levels", len(cb.allsegs))
 for lev in range(len(cb.allsegs)):
     print("")
-    print("level",lev)
+    print("level",lev,"levval",levvals[lev])
     print("The number of curves in this level", len(cb.allsegs[lev]))
     print("")
+
     for cur in range(len(cb.allsegs[lev])):
-        print("The number of points in this curve", len(cb.allsegs[lev][cur]))
-        #get x,y value of each point using cb.allsegs[lev][cur][:,0] , cb.allsegs[lev][cur][:,1]
+        # print("The number of points in this curve", len(cb.allsegs[lev][cur]))
+        xval = cb.allsegs[lev][cur][:,0]
+        yval = cb.allsegs[lev][cur][:,1]
+        # print(xval,yval)
+
+        g = ROOT.TGraph(len(xval))
+        g.SetName("gr_{}_{}".format(levvals[lev],cur+1))
+        for i, (xv,yv) in enumerate(zip(xval,yval)):
+            g.SetPoint(i,xv,yv)
+        graphs["gr_{}_{}".format(levvals[lev],cur+1)] = g
+
+if model == "BphiX":
+    outfile = TFile('BphiX_UL.root', 'recreate')
+else:
+    outfile = TFile('HZdZd_UL.root', 'recreate')
+outfile.cd()
+ 
+for k,v in graphs.items():
+    v.Write(k)
+outfile.Close()
 
 exit()
 #######################store values in root file######################
