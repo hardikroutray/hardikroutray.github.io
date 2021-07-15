@@ -13,20 +13,23 @@ from array import array
 
 model = str(sys.argv[-1])
 
-print("-----Please run in python 3-----")
+#print("-----Please run in python 3-----")
 
 if model == "BphiX":
     df_obs = pd.read_csv("https://hardikroutray.github.io/displaced_scouting/unblind/results/bphilimits_alldata_allctaus_wstheta_analysisDP_v1.csv")
 elif model == "HZdZd_2mu4mu" or model=="HZdZd_2mu4mu_eps":
-    df_obs = pd.read_csv("https://hardikroutray.github.io/displaced_scouting/unblind/results/hzdlimits_alldata_allctaus_weps_analysisDP_twomufourmu_v1.csv")
+    # df_obs = pd.read_csv("https://hardikroutray.github.io/displaced_scouting/unblind/results/hzdlimits_alldata_allctaus_weps_analysisDP_twomufourmu_v1.csv")
+    # df_obs = pd.read_csv("https://hardikroutray.github.io/displaced_scouting/unblind/results/asymplustoys/hzdlimits_8masses_allctaus_weps_analysisDP_twomufourmu_v1.csv")
+    df_obs = pd.read_csv("./hzdlimits_8masses_allctaus_weps_analysisDP_twomufourmu_v1.csv")
+
 else:
     print("-----Please input last argument as BphiX or HZdZd_2mu4mu or HZdZd_2mu4mu_eps-----")
     exit()
 
 print("Running on model", model)
 
-if model == "HZdZd_2mu4mu" or model == "HZdZd_2mu4mu_eps":
-    df_obs = df_obs[df_obs["BRbrULobs"] <= 1]
+# if model == "HZdZd_2mu4mu" or model == "HZdZd_2mu4mu_eps":
+#     df_obs = df_obs[df_obs["BRbrULobs"] <= 1]
 
 mask_ranges = np.array([
     [0.43,0.49],
@@ -41,12 +44,12 @@ mask_ranges = np.array([
 mask_ranges[:,0] = mask_ranges[:,0]/(1+0.05)
 mask_ranges[:,1] = mask_ranges[:,1]/(1-0.05)
 
-mask_ranges=np.array([[ 0.40952381,  0.51578947],
- [ 0.4952381,   0.61052632],
- [ 0.6952381,   0.88421053],
- [ 0.91428571,  1.13684211],
- [ 2.77142857,  4.09473684],
- [ 8.56190476, 11.33684211]])
+# mask_ranges=np.array([[ 0.40952381,  0.51578947],
+#  [ 0.4952381,   0.61052632],
+#  [ 0.6952381,   0.88421053],
+#  [ 0.91428571,  1.13684211],
+#  [ 2.77142857,  4.09473684],
+#  [ 8.56190476, 11.33684211]])
 
 
 if model == "BphiX":
@@ -85,10 +88,10 @@ if model == "BphiX":
     levvals = ["1em11","1em10","1em9","1em8","1em7","1em6","1em5"]    
     # levels = [1e-11,1e-10]
 else:
-    levels = [1e-6,1e-5,1e-4,1e-3,1e-2,1e-1,1]
-    levvals = ["1em6","1em5","1em4","1em3","1em2","1em1","1e0"]
+    levels = [1e-6,1e-5,1e-4,1e-3,1e-2,1e-1,4e-1,1]
+    levvals = ["1em6","1em5","1em4","1em3","1em2","1em1","4em1","1e0"]
 
-cb = plt.contourf(x,y,z,cmap="Set3",norm=norm,levels=levels)
+cb = plt.contourf(x,y,z,cmap="Blues",norm=norm,levels=levels)
 
 # cb = plt.contourf(X,Y,Z,cmap="Set3",norm=norm)
 # cb = plt.pcolormesh(x,y,z,cmap="Set3",norm=norm)
@@ -108,8 +111,12 @@ else:
 ylim = plt.ylim()
 for low,high in mask_ranges:
     plt.fill_betweenx(ylim, low, high, color="0.8", zorder=2)
-    
-plt.xlabel(r"m$_{\phi}$ [GeV]")
+
+if model == "BphiX":    
+    plt.xlabel(r"m$_{\phi}$ [GeV]")
+else:
+    plt.xlabel(r"m$_{Z_{D}}$ [GeV]")
+
 if "eps" in model:
     plt.ylabel(r"$\epsilon$")
 else:
@@ -140,17 +147,22 @@ for lev in range(len(cb.allsegs)):
 
     for cur in range(len(cb.allsegs[lev])):
         # print("The number of points in this curve", len(cb.allsegs[lev][cur]))
-        xval_ = cb.allsegs[lev][cur][:,0]
-        yval_ = cb.allsegs[lev][cur][:,1]
+        xval = cb.allsegs[lev][cur][:,0]
+        yval = cb.allsegs[lev][cur][:,1]
+
+        # xval_ = cb.allsegs[lev][cur][:,0]
+        # yval_ = cb.allsegs[lev][cur][:,1]
+
         # print(xval_,yval_)
 
-        xval = []
-        yval = []
-        for val in range(len(xval_)):
-            if any((sublist[0] <= xval_[val] <= sublist[1]) for sublist in mask_ranges):
-                continue
-            xval.append(xval_[val])
-            yval.append(yval_[val])
+        # xval = []
+        # yval = []
+        # for val in range(len(xval_)):
+        #     if any((sublist[0] <= xval_[val] <= sublist[1]) for sublist in mask_ranges):
+        #         continue
+        #     xval.append(xval_[val])
+        #     yval.append(yval_[val])
+
         # print(xval,yval)
 
         g = ROOT.TGraph(len(xval))
