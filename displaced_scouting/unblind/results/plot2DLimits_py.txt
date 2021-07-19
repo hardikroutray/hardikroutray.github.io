@@ -13,9 +13,7 @@ from array import array
 
 model = str(sys.argv[-1])
 
-#print("-----Please run in python 3-----")
-
-if model == "BphiX":
+if model == "BphiX" or model == "BphiX_thetasq":
     df_obs = pd.read_csv("https://hardikroutray.github.io/displaced_scouting/unblind/results/bphilimits_alldata_allctaus_wstheta_analysisDP_v1.csv")
 elif model == "HZdZd_2mu4mu" or model=="HZdZd_2mu4mu_eps":
     # df_obs = pd.read_csv("https://hardikroutray.github.io/displaced_scouting/unblind/results/hzdlimits_alldata_allctaus_weps_analysisDP_twomufourmu_v1.csv")
@@ -23,11 +21,14 @@ elif model == "HZdZd_2mu4mu" or model=="HZdZd_2mu4mu_eps":
     df_obs = pd.read_csv("./hzdlimits_8masses_allctaus_weps_analysisDP_twomufourmu_v1.csv")
 
 else:
-    print("-----Please input last argument as BphiX or HZdZd_2mu4mu or HZdZd_2mu4mu_eps-----")
+    print("-----Please input last argument as BphiX or BphiX_thetasq or HZdZd_2mu4mu or HZdZd_2mu4mu_eps-----")
     exit()
 
 print("Running on model", model)
 
+
+if model == "BphiX_thetasq":
+    df_obs["excl"] = df_obs["excl"].astype(int)
 # if model == "HZdZd_2mu4mu" or model == "HZdZd_2mu4mu_eps":
 #     df_obs = df_obs[df_obs["BRbrULobs"] <= 1]
 
@@ -52,29 +53,60 @@ mask_ranges[:,1] = mask_ranges[:,1]/(1-0.05)
 #  [ 8.56190476, 11.33684211]])
 
 
+dointerpolate = False
+storegraphs = False
+
+def interpolate(x,y,z):
+
+    f = interp2d(x, y, z, bounds_error=True,kind='linear')
+
+    x_step = 1
+    y_step = 1
+
+    x_new = np.arange(x.min(),x.max(),x_step+1)
+    # y_new = np.arange(y.min(),y.max(),y_step+1)
+    # x_new = np.array(df_obs["mass"].drop_duplicates())
+    y_new = np.array(df_obs["ctau"].drop_duplicates())
+
+    X, Y = np.meshgrid(x_new,y_new)
+    Z = f(x_new,y_new).reshape(len(y_new),-1)
+
+    # print("shape of:", " x", x.shape, " y", y.shape, " z", z.shape, " x_new", x_new.shape, " y_new", y_new.shape, " X", np.transpose(X).shape, " Y", np.transpose(Y).shape, " Z", np.transpose(Z).shape)
+
+    x = np.transpose(X)
+    y = np.transpose(Y)
+    z = np.transpose(Z)
+
+    # print(x,y,z)
+
+    return x, y, z
+
+
 if model == "BphiX":
     x = np.array(df_obs["mass"]).reshape(-1,13)
     y = np.array(df_obs["ctau"]).reshape(-1,13)
     z = np.array(df_obs["BRbrULobs"]).reshape(-1,13)
 
-    # f = interp2d(x, y, z, bounds_error=True)
-    # x_new = np.arange(0.3,5,0.001)
-    # y_new = np.arange(0.1,100,0.1)
-    # X, Y = np.meshgrid(y_new,x_new)
-
-    # print("shape of:", " x", x.shape, " y", y.shape, " z", z.shape, " x_new", x_new.shape, " y_new", y_new.shape, " X", X.shape, " Y", Y.shape)
-    # print(x.flatten(),y.flatten())
-    # Z = griddata((x.flatten(), y.flatten()), z.flatten(), (X, Y), method='cubic')
+elif model == "BphiX_thetasq":
+    x = np.array(df_obs["mass"]).reshape(-1,13)
+    y = np.array(df_obs["theta_sq_inflaton"]).reshape(-1,13)
+    z = np.array(df_obs["excl"]).reshape(-1,13)
 
 elif model == "HZdZd_2mu4mu":
     x = np.array(df_obs["mass"]).reshape(-1,21)
     y = np.array(df_obs["ctau"]).reshape(-1,21)
     z = np.array(df_obs["BRbrULobs"]).reshape(-1,21)
 
-else:
+elif model == "HZdZd_2mu4mu_eps":
     x = np.array(df_obs["mass"]).reshape(-1,21)
     y = np.array(df_obs["eps"]).reshape(-1,21)
     z = np.array(df_obs["BRbrULobs"]).reshape(-1,21)
+
+else:
+    pass
+
+if dointerpolate and model != "BphiX_thetasq":
+    x, y, z = interpolate(x,y,z)
 
 fig = plt.figure()
 
@@ -87,38 +119,41 @@ if model == "BphiX":
     levels = [1e-11,1e-10,1e-9,1e-8,1e-7,1e-6,1e-5]
     levvals = ["1em11","1em10","1em9","1em8","1em7","1em6","1em5"]    
     # levels = [1e-11,1e-10]
+elif model == "BphiX_thetasq":
+    levels = [0,1]
+    levvals = ["0","1"]
 else:
     levels = [1e-6,1e-5,1e-4,1e-3,1e-2,1e-1,4e-1,1]
     levvals = ["1em6","1em5","1em4","1em3","1em2","1em1","4em1","1e0"]
 
-cb = plt.contourf(x,y,z,cmap="Blues",norm=norm,levels=levels)
-
-# cb = plt.contourf(X,Y,Z,cmap="Set3",norm=norm)
-# cb = plt.pcolormesh(x,y,z,cmap="Set3",norm=norm)
-# cb = plt.scatter(x,y,c=z,cmap="Set3",norm=norm)
-# cb = plt.contour(x,y,z,levels=[0.00000000001,0.0000000001,0.000000001,0.00000001,0.0000001,0.000001,0.00001],cmap="Set3",norm=norm)
-# cb = plt.contour(x,y,z,levels=6,cmap="tab20",norm=norm)
-
+cb = plt.contourf(x,y,z,cmap="Pastel1",norm=norm,levels=levels)
 
 plt.yscale("log")
 plt.xscale("log")
 
-if model == "BphiX":
+if model == "BphiX" or model == "BphiX_thetasq":
     plt.xlim([0.3,5])
 else:
     plt.xlim([0.5,50])
+
+if model == "BphiX_thetasq":
+    plt.ylim([1e-9,1e-2])
+else:
+    pass
 
 ylim = plt.ylim()
 for low,high in mask_ranges:
     plt.fill_betweenx(ylim, low, high, color="0.8", zorder=2)
 
-if model == "BphiX":    
+if model == "BphiX" or "BphiX_thetasq":    
     plt.xlabel(r"m$_{\phi}$ [GeV]")
 else:
     plt.xlabel(r"m$_{Z_{D}}$ [GeV]")
 
 if "eps" in model:
     plt.ylabel(r"$\epsilon$")
+elif "thetasq" in model:
+    plt.ylabel(r"$\theta^{2}$")
 else:
     plt.ylabel(r"$c\tau$ [mm]")
 
@@ -126,6 +161,8 @@ plt.title(r"${}_\mathbf{CMS}$ ${}_\mathit{Supplementary}$                       
 
 if model == "BphiX":
     fig.colorbar(cb, label=r"BR(B $\rightarrow$ $\phi$ X).BR($\phi$ $\rightarrow$ $\mu\mu$)")
+elif model == "BphiX_thetasq":
+    pass
 else:
     fig.colorbar(cb, label=r"BR(H $\rightarrow$ Z$_{D}$Z$_{D}$)")
 
@@ -134,7 +171,10 @@ fig.patch.set_alpha(1)
 fig.savefig("mass_ctau_{}_exclusion.png".format(model), dpi=300)
 fig.savefig("mass_ctau_{}_exclusion.pdf".format(model))
 
-# exit()
+if storegraphs:
+    pass
+else:
+    exit()
 
 graphs = dict()
 
@@ -173,6 +213,8 @@ for lev in range(len(cb.allsegs)):
 
 if model == "BphiX":
     outfile = TFile('BphiX_UL.root', 'recreate')
+elif model == "BphiX_thetasq":
+    outfile = TFile('BphiX_thetasq_UL.root', 'recreate')
 elif model == "HZdZd_2mu4mu":
     outfile = TFile('HZdZd_UL.root', 'recreate')
 else:
@@ -184,45 +226,46 @@ for k,v in graphs.items():
 outfile.Close()
 
 exit()
+
 #######################store values in root file######################
 
-if model == "BphiX":
-    outfile = TFile('BphiX_UL.root', 'recreate')
-else:
-    outfile = TFile('HZdZd_UL.root', 'recreate')
+# if model == "BphiX":
+#     outfile = TFile('BphiX_UL.root', 'recreate')
+# else:
+#     outfile = TFile('HZdZd_UL.root', 'recreate')
 
-outfile.cd()
+# outfile.cd()
 
-if model == "BphiX":
-    ttree = TTree('ttree', 'ttree with BphiX UL (mass in GeV, ctau in mm)')
-else:
-    ttree = TTree('ttree', 'ttree with HZdZd UL (mass in GeV, ctau in mm)')
+# if model == "BphiX":
+#     ttree = TTree('ttree', 'ttree with BphiX UL (mass in GeV, ctau in mm)')
+# else:
+#     ttree = TTree('ttree', 'ttree with HZdZd UL (mass in GeV, ctau in mm)')
 
-mass = array("f", [0.0])
-ctau = array("f", [0.0])
-ul = array("d", [0.0])
+# mass = array("f", [0.0])
+# ctau = array("f", [0.0])
+# ul = array("d", [0.0])
 
-ttree.Branch("mass", mass, "mass/F")
-ttree.Branch("ctau", ctau, "ctau/F")
-ttree.Branch("ul", ul, "ul/D")
+# ttree.Branch("mass", mass, "mass/F")
+# ttree.Branch("ctau", ctau, "ctau/F")
+# ttree.Branch("ul", ul, "ul/D")
 
-masses = df_obs["mass"].tolist()
-ctaus = df_obs["ctau"].tolist()
-uls = df_obs["BRbrULobs"].tolist()
+# masses = df_obs["mass"].tolist()
+# ctaus = df_obs["ctau"].tolist()
+# uls = df_obs["BRbrULobs"].tolist()
 
-num = 0
-for ev in range(len(masses)):
-    num+= 1
+# num = 0
+# for ev in range(len(masses)):
+#     num+= 1
 
-    mass[0] = round(masses[ev],3)
-    ctau[0] = round(ctaus[ev],1)
-    ul[0] = round(uls[ev],15)
-    # ul[0] = uls[ev]
+#     mass[0] = round(masses[ev],3)
+#     ctau[0] = round(ctaus[ev],1)
+#     ul[0] = round(uls[ev],15)
+#     # ul[0] = uls[ev]
     
-    # print(mass[0],ctau[0],ul[0])
-    print(round(masses[ev],3),round(ctaus[ev],1),round(uls[ev],15))
+#     # print(mass[0],ctau[0],ul[0])
+#     print(round(masses[ev],3),round(ctaus[ev],1),round(uls[ev],15))
         
-    ttree.Fill()
+#     ttree.Fill()
 
-outfile.Write()
-outfile.Close()
+# outfile.Write()
+# outfile.Close()
